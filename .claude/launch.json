@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ribay-site",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "serve.ps1"],
+      "port": 5173,
+      "autoPort": true
+    }
+  ]
+}
