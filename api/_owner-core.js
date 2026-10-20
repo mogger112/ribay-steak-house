@@ -179,9 +179,16 @@ function createOwnerApi(deps) {
 
   // ---------- главный обработчик ----------
   return async function handle(req, env) {
-    if (!env.GITHUB_TOKEN || !env.OWNER_CODE || !env.SESSION_SECRET || env.SESSION_SECRET.length < 32) {
+    // Лишние пробелы и переводы строк при вставке значений в настройки Vercel не должны ломать вход
+    const ownerCode = String(env.OWNER_CODE || '').trim();
+    if (!String(env.GITHUB_TOKEN || '').trim() || !ownerCode || String(env.SESSION_SECRET || '').trim().length < 32) {
       return fail('not-configured', 500);
     }
+    env = Object.assign({}, env, {
+      OWNER_CODE: ownerCode,
+      GITHUB_TOKEN: String(env.GITHUB_TOKEN).trim(),
+      SESSION_SECRET: String(env.SESSION_SECRET).trim()
+    });
     const route = req.method + ' ' + req.action;
 
     if (route === 'GET state') {
