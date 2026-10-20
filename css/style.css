@@ -222,6 +222,8 @@ ul{margin:0;padding:0;list-style:none;}
 .brand--footer{margin-bottom:6px;}
 .footer__addr{color:var(--text-dim);font-size:.9rem;margin:0;}
 .footer__copy{color:#6b7082;font-size:.8rem;margin:0;}
+.footer__owner{color:#6b7082;font-size:.78rem;text-decoration:underline;margin-top:4px;}
+.footer__owner:hover{color:var(--gold-light);}
 
 /* Whatsapp FAB */
 .fab-whatsapp{

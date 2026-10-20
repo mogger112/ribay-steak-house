@@ -193,6 +193,16 @@ async function loadMenu() {
 
 loadMenu();
 
+// Owner login link (opens the Google Sheet; access is controlled by Google account sharing)
+(function () {
+  const url = (window.RIBAY_CONFIG || {}).ownerEditUrl;
+  const link = document.getElementById('ownerLink');
+  if (link && url && /^https:\/\/docs\.google\.com\/spreadsheets\//.test(url)) {
+    link.href = url;
+    link.hidden = false;
+  }
+})();
+
 // Lightbox for gallery
 const galleryImgs = document.querySelectorAll('#galleryGrid img');
 const lightbox = document.createElement('div');
