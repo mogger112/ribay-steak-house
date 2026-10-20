@@ -1,9 +1,11 @@
-// Панель владельца: правит меню и загружает фото через серверный файл api.php на хостинге.
+// Панель владельца: правит меню и загружает фото через серверную часть сайта (Vercel-функция или api.php).
 // В браузере нет ни паролей, ни ключей: вход держится на защищённой cookie сессии.
 (() => {
   'use strict';
 
-  const API = 'api.php';
+  // Где живёт серверная часть: на Vercel — /api/owner, на обычном хостинге с PHP — api.php (находим автоматически)
+  const ENDPOINTS = ['api/owner', 'api.php'];
+  let endpoint = null;
   const MAX_PHOTO_BYTES = 30 * 1024 * 1024;
   const MAX_SIDE = 1200;
 
@@ -39,20 +41,24 @@
     return e;
   }
 
-  // ---------- запросы к серверу (api.php) ----------
+  // ---------- запросы к серверу ----------
   async function api(action, options) {
     options = options || {};
     const headers = {};
     if (options.body) headers['Content-Type'] = 'application/json';
     if (csrf) headers['X-CSRF-Token'] = csrf;
-    let res;
-    try {
-      res = await fetch(API + '?action=' + action, Object.assign({}, options, { headers, credentials: 'same-origin', cache: 'no-store' }));
-    } catch (e) {
-      const err = new Error('network'); err.code = 'network'; throw err;
+    let res = null;
+    for (const ep of (endpoint ? [endpoint] : ENDPOINTS)) {
+      let r;
+      try {
+        r = await fetch(ep + '?action=' + action, Object.assign({}, options, { headers, credentials: 'same-origin', cache: 'no-store' }));
+      } catch (e) {
+        const err = new Error('network'); err.code = 'network'; throw err;
+      }
+      if (/json/i.test(r.headers.get('content-type') || '')) { res = r; endpoint = ep; break; }
     }
-    // Если вместо ответа сервера пришла обычная страница (например, на хостинге без PHP), панель ещё не подключена
-    if (!/json/i.test(res.headers.get('content-type') || '')) {
+    // Ни по одному адресу не ответил сервер (обычная страница или 404) — серверная часть не подключена
+    if (!res) {
       const err = new Error('not-configured'); err.code = 'not-configured'; throw err;
     }
     let data = {};
@@ -67,8 +73,9 @@
 
   function explain(err) {
     if (err.code === 'network') return 'Нет связи с интернетом или с сервером. Проверьте подключение и попробуйте ещё раз.';
-    if (err.code === 'not-configured') return 'Вход пока не подключён: на сервере нет файлов api.php и config.php или не работает PHP. Сообщите разработчику сайта.';
-    if (err.code === 'bad-photo') return err.message || 'Фото не подошло. Выберите другое (JPG или PNG).';
+    if (err.code === 'not-configured') return 'Вход пока не подключён: на сервере не настроены ключи или не работает серверная часть. Сообщите разработчику сайта.';
+    if (err.code === 'bad-photo') return err.userMessage || 'Фото не подошло. Выберите другое (JPG или PNG).';
+    if (err.code === 'github') return 'Не удалось связаться с GitHub. Попробуйте ещё раз через минуту.';
     if (err.code === 'bad-code') return 'Неверный код.';
     if (err.code === 'too-many') return 'Слишком много попыток. Подождите 15 минут и попробуйте снова.';
     if (err.code === 'unauthorized') return 'Сессия закончилась. Войдите снова.';
@@ -78,7 +85,7 @@
     return 'Не удалось выполнить действие (' + (err.status || err.message) + '). Попробуйте ещё раз.';
   }
 
-  function badPhoto(text) { const e = new Error(text); e.code = 'bad-photo'; return e; }
+  function badPhoto(text) { const e = new Error(text); e.code = 'bad-photo'; e.userMessage = text; return e; }
 
   // ---------- кодирование ----------
   function blobToBase64(blob) {
