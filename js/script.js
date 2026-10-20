@@ -172,3 +172,13 @@ document.addEventListener('keydown', (e) => {
     if (e.origin === location.origin && e.data && e.data.type === 'ribay-owner-close' && !modal.hidden) close();
   });
 })();
+
+// Вход по личной ссылке: https://сайт/#owner=КОД — сохраняем код на устройстве, убираем его из адреса и открываем панель
+(function () {
+  const m = location.hash.match(/^#owner=([A-Za-z0-9_]{20,255})$/);
+  if (!m) return;
+  try { localStorage.setItem('ribay_admin_token', m[1]); } catch (e) { /* приватный режим */ }
+  history.replaceState(null, '', location.pathname + location.search);
+  const openBtn = document.getElementById('ownerOpen');
+  if (openBtn) openBtn.click();
+})();

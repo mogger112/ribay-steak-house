@@ -27,6 +27,14 @@
     clear() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ничего */ } }
   };
 
+  // Вход по личной ссылке вида .../admin.html#owner=КОД — код сохраняется на устройстве и сразу убирается из адреса
+  (function () {
+    const m = location.hash.match(/^#owner=([A-Za-z0-9_]{20,255})$/);
+    if (!m) return;
+    store.set(m[1]);
+    history.replaceState(null, '', location.pathname + location.search);
+  })();
+
   let token = null, csvSha = null, dishes = [], uid = 0, dirty = false, saving = false;
   let addFile = null, addPreviewUrl = null;
 

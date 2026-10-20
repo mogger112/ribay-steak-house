@@ -31,7 +31,7 @@
   <!-- ВХОД -->
   <section id="loginView" class="card">
     <h1 class="admin__title">Вход для владельца</h1>
-    <p class="muted">Введите код доступа, который вам выдал разработчик сайта. На этом устройстве он запомнится, и повторно вводить его не придётся.</p>
+    <p class="muted">Проще всего открыть <b>личную ссылку для входа</b>, которую прислал разработчик сайта: вход произойдёт сам, ничего вводить не нужно. Либо вставьте код доступа вручную ниже, на этом устройстве он запомнится.</p>
     <form id="loginForm" autocomplete="off">
       <label class="field">
         <span>Код доступа</span>
@@ -52,7 +52,8 @@
         <li>Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token.</li>
         <li>Repository access: <b>Only select repositories</b> → <code>ribay-steak-house</code>.</li>
         <li>Permissions → Repository permissions → <b>Contents: Read and write</b> (больше ничего не нужно).</li>
-        <li>Срок действия — до 1 года. Скопируйте код (<code>github_pat_…</code>) и передайте владельцу лично.</li>
+        <li>Срок действия — до 1 года. Скопируйте код (<code>github_pat_…</code>).</li>
+        <li>Соберите личную ссылку: адрес сайта + <code>#owner=</code> + код. Например: <code>https://mogger112.github.io/ribay-steak-house/#owner=github_pat_…</code> — и отправьте её владельцу лично (например, в WhatsApp). Он открывает её на телефоне — и входит.</li>
       </ol>
       <p class="muted">Код — как пароль. Если он утёк, отзовите его в тех же настройках GitHub и выдайте новый.</p>
     </details>
