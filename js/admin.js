@@ -21,7 +21,6 @@
   try { localStorage.removeItem('ribay_admin_token'); localStorage.removeItem('ribay_admin_session'); } catch (e) { /* ничего */ }
 
   let loginStarted = false; // владелец уже нажал «Войти» — поздний результат стартовой проверки игнорируем
-  let demo = false; // временный демо-режим (js/admin-demo.js): ничего реально не сохраняет
   let csrf = null, csvSha = null, dishes = [], uid = 0, dirty = false, saving = false;
   let addFile = null, addPreviewUrl = null;
 
@@ -43,7 +42,6 @@
   // ---------- запросы к серверу (api.php) ----------
   async function api(action, options) {
     options = options || {};
-    if (demo) return window.RIBAY_DEMO.handle(action, options);
     const headers = {};
     if (options.body) headers['Content-Type'] = 'application/json';
     if (csrf) headers['X-CSRF-Token'] = csrf;
@@ -148,7 +146,6 @@
     $('loginView').hidden = true;
     $('appView').hidden = false;
     $('logoutBtn').hidden = false;
-    $('demoBanner').hidden = !demo;
     render();
   }
 
@@ -157,7 +154,6 @@
     $('logoutBtn').hidden = true;
     $('loginView').hidden = false;
     $('saveBar').hidden = true;
-    $('demoBanner').hidden = true;
     showMsg($('loginMsg'), message || '', message ? 'err' : '');
   }
 
@@ -180,26 +176,13 @@
     $('loginBtn').textContent = 'Проверяю…';
     showMsg($('loginMsg'), '', '');
     try {
-      const loginBody = { method: 'POST', body: JSON.stringify({ code, remember: $('rememberInput').checked }) };
-      let r;
-      try {
-        r = await api('login', loginBody);
-      } catch (err) {
-        // Демо: только если настоящий сервер не подключён и введён демо-код
-        if (err.code === 'not-configured' && window.RIBAY_DEMO && code === window.RIBAY_DEMO.code) {
-          demo = true;
-          r = await api('login', loginBody);
-        } else {
-          throw err;
-        }
-      }
+      const r = await api('login', { method: 'POST', body: JSON.stringify({ code, remember: $('rememberInput').checked }) });
       csrf = r.csrf;
       if (!(dirty && dishes.length)) await loadMenu(); // после истёкшей сессии не затираем несохранённые правки
       $('codeInput').value = '';
       showApp();
     } catch (err) {
       csrf = null;
-      demo = false;
       showMsg($('loginMsg'), explain(err), 'err');
     } finally {
       $('loginBtn').disabled = false;
@@ -210,7 +193,6 @@
   $('logoutBtn').addEventListener('click', () => {
     if (dirty && !confirm('Есть несохранённые изменения. Выйти без сохранения?')) return;
     api('logout', { method: 'POST', body: '{}' }).catch(() => {});
-    demo = false;
     csrf = null; dishes = []; dirty = false;
     updateBar();
     showLogin('');
@@ -393,9 +375,7 @@
       csvSha = res.version;
       dishes.forEach(d => { d.isNew = false; });
       dirty = false;
-      showMsg($('globalMsg'), demo
-        ? 'Готово (демо)! Это только показ: на настоящем сайте ничего не изменилось.'
-        : 'Готово! Изменения появятся на сайте через 1–2 минуты.', 'ok');
+      showMsg($('globalMsg'), 'Готово! Изменения появятся на сайте через 1–2 минуты.', 'ok');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       if (err.code === 'unauthorized') {
@@ -427,11 +407,6 @@
     .catch(err => {
       if (loginStarted) return null;
       csrf = null;
-      // Демо-сессия во вкладке: после перезагрузки страницы остаёмся в демо
-      if (err.code === 'not-configured' && window.RIBAY_DEMO && window.RIBAY_DEMO.isActive()) {
-        demo = true;
-        return api('state').then(st => (loginStarted ? null : resume(st))).catch(() => { if (!loginStarted) { demo = false; showLogin(''); } });
-      }
       showLogin(err.code === 'not-configured' ? explain(err) : '');
     });
 })();
