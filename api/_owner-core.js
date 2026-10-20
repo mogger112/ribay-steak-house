@@ -175,6 +175,13 @@ function createOwnerApi(deps) {
     return { err: fail('bad-request', 400) };
   }
 
+  // Ответ при отказе GitHub: код и текст причины (секретов в них нет) помогают понять, что не так с токеном
+  const githubFail = r => reply(502, {
+    error: 'github',
+    status: r.status,
+    message: r.data && typeof r.data.message === 'string' ? r.data.message.slice(0, 160) : undefined
+  });
+
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   // ---------- главный обработчик ----------
@@ -229,7 +236,7 @@ function createOwnerApi(deps) {
 
     if (route === 'GET menu') {
       const r = await github(env, 'GET', CSV_PATH);
-      if (!r.ok || typeof r.data.content !== 'string') return fail('github', 502);
+      if (!r.ok || typeof r.data.content !== 'string') return githubFail(r);
       return reply(200, { csv: dec.decode(b64ToBytes(r.data.content.replace(/\s/g, ''))), version: r.data.sha });
     }
 
@@ -244,7 +251,7 @@ function createOwnerApi(deps) {
         sha: version
       });
       if (r.status === 409 || r.status === 422) return fail('conflict', 409);
-      if (!r.ok || !r.data.content) return fail('github', 502);
+      if (!r.ok || !r.data.content) return githubFail(r);
       return reply(200, { version: r.data.content.sha });
     }
 
@@ -259,7 +266,7 @@ function createOwnerApi(deps) {
       if (!size || size.w < 1 || size.h < 1 || size.w > MAX_PHOTO_SIDE || size.h > MAX_PHOTO_SIDE) return fail('bad-photo', 400);
       const path = UPLOAD_DIR + '/p-' + deps.randomHex(6) + '.jpg';
       const r = await github(env, 'PUT', path, { message: 'Панель владельца: фото блюда', content: data });
-      if (!r.ok) return fail('github', 502);
+      if (!r.ok) return githubFail(r);
       return reply(200, { path });
     }
 

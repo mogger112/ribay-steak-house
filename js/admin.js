@@ -66,6 +66,7 @@
     if (!res.ok) {
       const err = new Error(data.error || 'HTTP ' + res.status);
       err.status = res.status; err.code = data.error || null;
+      err.githubStatus = data.status; err.detail = data.message;
       throw err;
     }
     return data;
@@ -75,7 +76,10 @@
     if (err.code === 'network') return 'Нет связи с интернетом или с сервером. Проверьте подключение и попробуйте ещё раз.';
     if (err.code === 'not-configured') return 'Вход пока не подключён: на сервере не настроены ключи или не работает серверная часть. Сообщите разработчику сайта.';
     if (err.code === 'bad-photo') return err.userMessage || 'Фото не подошло. Выберите другое (JPG или PNG).';
-    if (err.code === 'github') return 'Не удалось связаться с GitHub. Попробуйте ещё раз через минуту.';
+    if (err.code === 'github') {
+      const why = err.githubStatus ? ' (GitHub ответил ' + err.githubStatus + (err.detail ? ': ' + err.detail : '') + ')' : '';
+      return 'GitHub не принял запись' + why + '. Если ошибка повторяется, сообщите разработчику сайта.';
+    }
     if (err.code === 'bad-code') return 'Неверный код.';
     if (err.code === 'too-many') return 'Слишком много попыток. Подождите 15 минут и попробуйте снова.';
     if (err.code === 'unauthorized') return 'Сессия закончилась. Войдите снова.';
