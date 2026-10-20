@@ -1,0 +1,68 @@
+/* Панель владельца */
+.admin [hidden]{display:none !important;}
+.admin{min-height:100vh;padding-bottom:110px;}
+.admin__top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);background:rgba(12,14,20,.9);position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);}
+.admin__top-actions{display:flex;gap:8px;align-items:center;}
+.admin__top .btn{padding:9px 16px;font-size:.85rem;}
+.admin__main{max-width:760px;margin:0 auto;padding:28px 16px;}
+.admin__title{font-family:var(--serif);font-size:clamp(1.7rem,5vw,2.2rem);margin:0 0 12px;font-weight:600;}
+.admin__sub{font-family:var(--serif);font-size:1.4rem;margin:0 0 16px;font-weight:600;}
+.admin__head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
+.admin__head .admin__title{margin:0;}
+.muted{color:var(--text-dim);font-size:.92rem;margin:0 0 20px;}
+
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:22px;}
+
+.field{display:block;margin-bottom:16px;}
+.field>span{display:block;font-size:.8rem;font-weight:700;color:var(--gold);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;}
+.admin input[type=text],.admin input[type=password],.admin select{
+  width:100%;background:var(--bg-panel-2);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:12px 14px;font:inherit;font-size:16px;
+}
+.admin input:focus,.admin select:focus{outline:2px solid var(--gold);outline-offset:1px;}
+.check{display:flex;align-items:center;gap:10px;margin:0 0 18px;color:var(--text-dim);font-size:.92rem;cursor:pointer;}
+.check input{width:20px;height:20px;accent-color:var(--gold);}
+.btn--block{width:100%;}
+.row-actions{display:flex;gap:10px;flex-wrap:wrap;}
+
+.msg{margin:14px 0 0;padding:12px 14px;border-radius:10px;font-size:.92rem;border:1px solid var(--line);}
+.msg--err{background:rgba(200,70,70,.12);border-color:rgba(200,70,70,.5);color:#ffc9c9;}
+.msg--ok{background:rgba(90,170,110,.14);border-color:rgba(90,170,110,.5);color:#cfeedb;}
+
+.help{margin-top:22px;border-top:1px solid var(--line);padding-top:16px;color:var(--text-dim);font-size:.9rem;}
+.help summary{cursor:pointer;color:var(--gold-light);font-weight:600;}
+.help ol{padding-left:20px;margin:12px 0;}
+.help li{margin-bottom:6px;}
+.help code{background:var(--bg-panel-2);padding:2px 6px;border-radius:6px;font-size:.85em;}
+
+.photo-pick{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.photo-pick img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line);}
+.photo-pick label.btn{cursor:pointer;}
+
+/* список блюд */
+.cat{margin:30px 0 12px;font-family:var(--serif);font-size:1.5rem;color:var(--gold-light);font-weight:600;}
+.dish-row{display:grid;grid-template-columns:84px 1fr;gap:14px;background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
+.dish-row.is-hidden{opacity:.55;}
+.dish-row.is-new{border-color:var(--gold);}
+.dish-thumb{width:84px;height:84px;border-radius:10px;object-fit:cover;background:var(--bg-panel-2);border:1px solid var(--line);}
+.dish-thumb--empty{display:flex;align-items:center;justify-content:center;text-align:center;font-size:.7rem;color:var(--text-dim);}
+.dish-fields{min-width:0;}
+.dish-fields .name{margin-bottom:10px;}
+.dish-line{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.dish-line .price{width:150px;flex:0 0 150px;color:var(--text);}
+.dish-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;}
+.tool{background:transparent;border:1px solid var(--line);color:var(--text-dim);border-radius:999px;padding:7px 14px;font:inherit;font-size:.82rem;font-weight:600;cursor:pointer;}
+.tool:hover{border-color:var(--gold);color:var(--gold-light);}
+.tool--danger:hover{border-color:#d66;color:#f99;}
+.tool input[type=file]{display:none;}
+label.tool{display:inline-block;}
+
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;padding:14px 16px;background:rgba(20,24,38,.97);border-top:1px solid var(--gold);backdrop-filter:blur(8px);}
+.savebar span{font-weight:600;}
+.savebar .btn[disabled]{opacity:.6;cursor:wait;}
+
+@media (max-width:520px){
+  .dish-row{grid-template-columns:64px 1fr;padding:12px;}
+  .dish-thumb{width:64px;height:64px;}
+  .dish-line .price{flex:1 1 100%;width:100%;}
+}

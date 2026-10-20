@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Панель владельца — RIBAY Steak House</title>
+<link rel="icon" href="assets/img/logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin">
+
+<header class="admin__top">
+  <a class="brand" href="./">
+    <img src="assets/img/logo.jpg" alt="RIBAY Steak House" class="brand__logo">
+    <span class="brand__text">RIBAY <em>Панель владельца</em></span>
+  </a>
+  <div class="admin__top-actions">
+    <a href="./" class="btn btn--ghost">На сайт</a>
+    <button type="button" id="logoutBtn" class="btn btn--outline" hidden>Выйти</button>
+  </div>
+</header>
+
+<main class="admin__main">
+
+  <!-- ВХОД -->
+  <section id="loginView" class="card">
+    <h1 class="admin__title">Вход для владельца</h1>
+    <p class="muted">Введите код доступа, который вам выдал разработчик сайта. На этом устройстве он запомнится, и повторно вводить его не придётся.</p>
+    <form id="loginForm" autocomplete="off">
+      <label class="field">
+        <span>Код доступа</span>
+        <input type="password" id="tokenInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…" required>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="rememberInput" checked>
+        <span>Запомнить на этом устройстве</span>
+      </label>
+      <button type="submit" class="btn btn--gold btn--block" id="loginBtn">Войти</button>
+    </form>
+    <p id="loginMsg" class="msg" role="alert" hidden></p>
+
+    <details class="help">
+      <summary>Как получить код доступа (для разработчика)</summary>
+      <ol>
+        <li>Войдите на github.com под аккаунтом, которому принадлежит репозиторий сайта.</li>
+        <li>Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token.</li>
+        <li>Repository access: <b>Only select repositories</b> → <code>ribay-steak-house</code>.</li>
+        <li>Permissions → Repository permissions → <b>Contents: Read and write</b> (больше ничего не нужно).</li>
+        <li>Срок действия — до 1 года. Скопируйте код (<code>github_pat_…</code>) и передайте владельцу лично.</li>
+      </ol>
+      <p class="muted">Код — как пароль. Если он утёк, отзовите его в тех же настройках GitHub и выдайте новый.</p>
+    </details>
+  </section>
+
+  <!-- ПАНЕЛЬ -->
+  <section id="appView" hidden>
+    <div class="admin__head">
+      <h1 class="admin__title">Меню</h1>
+      <button type="button" id="addToggle" class="btn btn--gold">＋ Добавить блюдо</button>
+    </div>
+    <p class="muted">Меняйте цены и названия прямо в списке. Внизу появится кнопка «Сохранить на сайте» — после неё изменения видны посетителям через 1–2 минуты.</p>
+
+    <form id="addForm" class="card" hidden>
+      <h2 class="admin__sub">Новое блюдо</h2>
+      <label class="field">
+        <span>Раздел меню</span>
+        <select id="addCategory"></select>
+      </label>
+      <label class="field" id="addNewCatWrap" hidden>
+        <span>Название нового раздела</span>
+        <input type="text" id="addNewCat" maxlength="40" placeholder="Например: Напитки">
+      </label>
+      <label class="field">
+        <span>Название блюда</span>
+        <input type="text" id="addName" maxlength="120" placeholder="Например: Рибай стейк, 350 г" required>
+      </label>
+      <label class="field">
+        <span>Цена</span>
+        <input type="text" id="addPrice" maxlength="40" placeholder="Например: 1200" inputmode="decimal">
+      </label>
+      <div class="field">
+        <span>Фото (необязательно)</span>
+        <div class="photo-pick">
+          <img id="addPreview" alt="" hidden>
+          <label class="btn btn--outline">
+            Выбрать фото
+            <input type="file" id="addPhoto" accept="image/*" hidden>
+          </label>
+        </div>
+      </div>
+      <div class="row-actions">
+        <button type="submit" class="btn btn--gold">Добавить в список</button>
+        <button type="button" id="addCancel" class="btn btn--outline">Отмена</button>
+      </div>
+      <p id="addMsg" class="msg" role="alert" hidden></p>
+    </form>
+
+    <div id="dishList"></div>
+  </section>
+
+  <p id="globalMsg" class="msg" role="status" hidden></p>
+</main>
+
+<div id="saveBar" class="savebar" hidden>
+  <span id="saveInfo">Есть несохранённые изменения</span>
+  <button type="button" id="saveBtn" class="btn btn--gold">Сохранить на сайте</button>
+</div>
+
+<script src="js/menu-lib.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

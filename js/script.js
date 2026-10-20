@@ -14,9 +14,8 @@ window.addEventListener('scroll', () => {
   header.style.boxShadow = window.scrollY > 10 ? '0 10px 30px rgba(0,0,0,.35)' : 'none';
 });
 
-// ===== Menu (data-driven: Google Sheet CSV, fallback data/menu.csv) =====
-const MENU_FALLBACK_CSV = 'data/menu.csv';
-const HIDE_VALUES = ['нет', 'no', '0', 'false', 'скрыть', 'выкл', '-'];
+// ===== Menu (data-driven from data/menu.csv, edited via admin.html) =====
+const MENU_CSV = 'data/menu.csv';
 const PHOTO_FOCUS = {
   'dish-telyatina.jpg': '60% 78%',
   'gallery-02.jpg': '50% 55%',
@@ -26,69 +25,10 @@ const PHOTO_FOCUS = {
   'dish-cheesecake.jpg': '50% 45%'
 };
 
-function parseCSV(text) {
-  const rows = [];
-  let row = [], field = '', quoted = false;
-  text = text.replace(/^﻿/, '');
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (quoted) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false;
-      } else field += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ',') { row.push(field); field = ''; }
-    else if (c === '\n' || c === '\r') {
-      if (c === '\r' && text[i + 1] === '\n') i++;
-      row.push(field); rows.push(row); row = []; field = '';
-    } else field += c;
-  }
-  if (field !== '' || row.length) { row.push(field); rows.push(row); }
-  return rows;
-}
-
-function rowsToDishes(rows) {
-  if (!rows.length) return [];
-  const head = rows[0].map(h => h.trim().toLowerCase());
-  const col = names => head.findIndex(h => names.includes(h));
-  const iCat = col(['категория', 'category']);
-  const iName = col(['название', 'name']);
-  const iPrice = col(['цена', 'price']);
-  const iPhoto = col(['фото', 'photo']);
-  const iShow = col(['показывать', 'show']);
-  if (iCat < 0 || iName < 0) return [];
-  const cell = (r, i) => (i >= 0 && r[i] ? r[i].trim() : '');
-  return rows.slice(1)
-    .map(r => ({
-      category: cell(r, iCat),
-      name: cell(r, iName),
-      price: cell(r, iPrice),
-      photo: cell(r, iPhoto),
-      show: cell(r, iShow).toLowerCase()
-    }))
-    .filter(d => d.category && d.name && !HIDE_VALUES.includes(d.show));
-}
-
-function formatPrice(raw) {
-  const m = raw.replace(/ /g, ' ').match(/^\s*(\d[\d\s]*(?:[.,]\d+)?)\s*(?:₽|р\.?|руб\.?)?\s*$/i);
-  if (!m) return raw;
-  const n = parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
-}
-
-function photoSrc(p) {
-  if (!p) return null;
-  if (/^https:\/\/[^\s"'<>]+$/i.test(p)) return p;
-  if (/^[\w.\-\/]+\.(jpe?g|png|webp|avif)$/i.test(p) && !p.includes('..') && !p.startsWith('/')) {
-    return p.includes('/') ? p : 'assets/img/' + p;
-  }
-  return null;
-}
-
 function dishCard(d) {
   const card = document.createElement('div');
   card.className = 'dish';
-  const src = photoSrc(d.photo);
+  const src = MenuLib.photoSrc(d.photo);
   if (src) {
     const img = document.createElement('img');
     img.src = src;
@@ -108,7 +48,7 @@ function dishCard(d) {
   if (d.price) {
     const price = document.createElement('span');
     price.className = 'price';
-    price.textContent = formatPrice(d.price);
+    price.textContent = MenuLib.formatPrice(d.price);
     body.appendChild(price);
   }
   card.appendChild(body);
@@ -166,22 +106,11 @@ async function fetchText(url, ms) {
 }
 
 async function loadMenu() {
-  const sheetUrl = (window.RIBAY_CONFIG || {}).menuSheetCsvUrl;
   let dishes = [];
-  if (sheetUrl) {
-    try {
-      dishes = rowsToDishes(parseCSV(await fetchText(sheetUrl, 6000)));
-      if (!dishes.length) console.warn('Таблица меню пуста или опубликована неверно — показано резервное меню');
-    } catch (err) {
-      console.warn('Не удалось загрузить таблицу меню — показано резервное меню', err);
-    }
-  }
-  if (!dishes.length) {
-    try {
-      dishes = rowsToDishes(parseCSV(await fetchText(MENU_FALLBACK_CSV, 8000)));
-    } catch (err) {
-      console.error('Не удалось загрузить меню', err);
-    }
+  try {
+    dishes = MenuLib.parseMenu(await fetchText(MENU_CSV, 8000)).filter(d => !d.hidden);
+  } catch (err) {
+    console.error('Не удалось загрузить меню', err);
   }
   if (dishes.length) {
     renderMenu(dishes);
@@ -192,16 +121,6 @@ async function loadMenu() {
 }
 
 loadMenu();
-
-// Owner login link (opens the Google Sheet; access is controlled by Google account sharing)
-(function () {
-  const url = (window.RIBAY_CONFIG || {}).ownerEditUrl;
-  const link = document.getElementById('ownerLink');
-  if (link && url && /^https:\/\/docs\.google\.com\/spreadsheets\//.test(url)) {
-    link.href = url;
-    link.hidden = false;
-  }
-})();
 
 // Lightbox for gallery
 const galleryImgs = document.querySelectorAll('#galleryGrid img');
