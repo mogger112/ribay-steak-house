@@ -170,6 +170,7 @@ ul{margin:0;padding:0;list-style:none;}
 .dish--noimg .price{flex:0 0 auto;text-align:right;font-size:.85rem;max-width:40%;}
 .dish--noimg:hover{border-color:var(--gold);transform:none;background:rgba(205,168,106,.04);}
 
+.menu__status{text-align:center;color:var(--text-dim);padding:40px 0;margin:0;}
 .menu__note{text-align:center;margin-top:44px;color:var(--text-dim);font-size:.9rem;}
 .menu__note a{color:var(--gold-light);text-decoration:underline;}
 

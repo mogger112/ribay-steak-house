@@ -1,27 +1,37 @@
 $root = $PSScriptRoot
-$port = 5173
-$listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:$port/")
-$listener.Start()
+$startPort = if ($env:PORT) { [int]$env:PORT } else { 5173 }
+$listener = $null
+$port = $startPort
+for ($p = $startPort; $p -lt $startPort + 20; $p++) {
+  $candidate = New-Object System.Net.HttpListener
+  $candidate.Prefixes.Add("http://localhost:$p/")
+  try {
+    $candidate.Start()
+    $listener = $candidate
+    $port = $p
+    break
+  } catch {
+    $candidate.Close()
+  }
+}
+if (-not $listener) { Write-Host "No free port found starting from $startPort"; exit 1 }
 Write-Host "Serving $root on http://localhost:$port/"
 
 $mime = @{
-  ".html"="text/html; charset=utf-8"; ".css"="text/css"; ".js"="application/javascript";
-  ".jpg"="image/jpeg"; ".jpeg"="image/jpeg"; ".png"="image/png"; ".svg"="image/svg+xml";
-  ".ico"="image/x-icon"; ".json"="application/json"
+  ".html"="text/html; charset=utf-8"; ".css"="text/css; charset=utf-8"; ".js"="application/javascript; charset=utf-8";
+  ".csv"="text/csv; charset=utf-8"; ".jpg"="image/jpeg"; ".jpeg"="image/jpeg"; ".png"="image/png";
+  ".svg"="image/svg+xml"; ".ico"="image/x-icon"; ".json"="application/json"
 }
 
 while ($listener.IsListening) {
   $context = $listener.GetContext()
-  $req = $context.Request
   $res = $context.Response
   try {
-    $path = [System.Uri]::UnescapeDataString($req.Url.AbsolutePath)
+    $path = [System.Uri]::UnescapeDataString($context.Request.Url.AbsolutePath)
     if ($path -eq "/") { $path = "/index.html" }
-    $filePath = Join-Path $root ($path.TrimStart("/"))
-    if (Test-Path $filePath -PathType Leaf) {
-      $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
-      $ct = $mime[$ext]
+    $filePath = [System.IO.Path]::GetFullPath((Join-Path $root $path.TrimStart("/")))
+    if ($filePath.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path $filePath -PathType Leaf)) {
+      $ct = $mime[[System.IO.Path]::GetExtension($filePath).ToLower()]
       if (-not $ct) { $ct = "application/octet-stream" }
       $bytes = [System.IO.File]::ReadAllBytes($filePath)
       $res.ContentType = $ct
@@ -29,7 +39,7 @@ while ($listener.IsListening) {
       $res.OutputStream.Write($bytes, 0, $bytes.Length)
     } else {
       $res.StatusCode = 404
-      $msg = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found: $path")
+      $msg = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found")
       $res.OutputStream.Write($msg, 0, $msg.Length)
     }
   } catch {
