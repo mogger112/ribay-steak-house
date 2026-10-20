@@ -1,13 +1,11 @@
-// Панель владельца: правит data/menu.csv и загружает фото прямо в репозиторий сайта через GitHub API.
-// Код доступа хранится только в браузере владельца (localStorage) и отправляется только на api.github.com.
+// Панель владельца: правит меню и загружает фото через наш сервер (worker/index.js).
+// В браузере хранится только временная подписанная сессия — ключей GitHub здесь нет.
 (() => {
   'use strict';
 
-  const REPO = { owner: 'mogger112', name: 'ribay-steak-house', branch: 'main' };
-  const R = REPO.owner + '/' + REPO.name;
-  const CSV_PATH = 'data/menu.csv';
-  const UPLOAD_DIR = 'assets/img/uploads';
-  const TOKEN_KEY = 'ribay_admin_token';
+  // Адрес сервера (Cloudflare Worker), например 'https://ribay-admin.ИМЯ.workers.dev'. Пусто — вход ещё не подключён.
+  const WORKER_URL = '';
+  const SESSION_KEY = 'ribay_admin_session';
   const MAX_PHOTO_BYTES = 30 * 1024 * 1024;
   const MAX_SIDE = 1200;
 
@@ -22,20 +20,14 @@
   }
 
   const store = {
-    get() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } },
-    set(v) { try { localStorage.setItem(TOKEN_KEY, v); } catch (e) { /* приватный режим */ } },
-    clear() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ничего */ } }
+    get() { try { return localStorage.getItem(SESSION_KEY); } catch (e) { return null; } },
+    set(v) { try { localStorage.setItem(SESSION_KEY, v); } catch (e) { /* приватный режим */ } },
+    clear() { try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* ничего */ } }
   };
+  // Старые ключи прошлых версий панели больше не нужны
+  try { localStorage.removeItem('ribay_admin_token'); } catch (e) { /* ничего */ }
 
-  // Вход по личной ссылке вида .../admin.html#owner=КОД — код сохраняется на устройстве и сразу убирается из адреса
-  (function () {
-    const m = location.hash.match(/^#owner=([A-Za-z0-9_]{20,255})$/);
-    if (!m) return;
-    store.set(m[1]);
-    history.replaceState(null, '', location.pathname + location.search);
-  })();
-
-  let token = null, csvSha = null, dishes = [], uid = 0, dirty = false, saving = false;
+  let session = null, csvSha = null, dishes = [], uid = 0, dirty = false, saving = false;
   let addFile = null, addPreviewUrl = null;
 
   // ---------- маленький помощник для DOM (весь текст — только через textContent) ----------
@@ -53,45 +45,44 @@
     return e;
   }
 
-  // ---------- GitHub API ----------
-  async function gh(path, options) {
+  // ---------- запросы к нашему серверу ----------
+  async function api(path, options) {
     options = options || {};
-    const headers = {
-      Accept: 'application/vnd.github+json',
-      Authorization: 'Bearer ' + token,
-      'X-GitHub-Api-Version': '2022-11-28'
-    };
+    if (!WORKER_URL) { const e = new Error('not-configured'); e.code = 'not-configured'; throw e; }
+    const headers = {};
+    if (session) headers.Authorization = 'Bearer ' + session;
     if (options.body) headers['Content-Type'] = 'application/json';
     let res;
     try {
-      res = await fetch('https://api.github.com' + path, Object.assign({}, options, { headers, cache: 'no-store' }));
+      res = await fetch(WORKER_URL.replace(/\/$/, '') + path, Object.assign({}, options, { headers, cache: 'no-store' }));
     } catch (e) {
       const err = new Error('network'); err.code = 'network'; throw err;
     }
-    if (!res.ok) { const err = new Error('HTTP ' + res.status); err.status = res.status; throw err; }
-    return res.json();
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* пустой ответ */ }
+    if (!res.ok) {
+      const err = new Error(data.error || 'HTTP ' + res.status);
+      err.status = res.status; err.code = data.error || null;
+      throw err;
+    }
+    return data;
   }
 
   function explain(err) {
-    if (err.code === 'network') return 'Нет связи с интернетом или с GitHub. Проверьте подключение и попробуйте ещё раз.';
-    if (err.code === 'no-push') return 'У этого кода нет права записи. При создании кода нужно выбрать Contents: Read and write.';
+    if (err.code === 'network') return 'Нет связи с интернетом или с сервером. Проверьте подключение и попробуйте ещё раз.';
+    if (err.code === 'not-configured') return 'Вход пока не подключён к серверу. Сообщите разработчику сайта.';
     if (err.code === 'bad-photo') return err.message;
-    if (err.status === 401) return 'Код доступа неверный или срок его действия истёк.';
-    if (err.status === 403 || err.status === 404) return 'Нет доступа к сайту. Проверьте, что код выдан на репозиторий ribay-steak-house и имеет право Contents: Read and write.';
-    if (err.status === 409 || err.status === 422) return 'Меню уже изменили в другом месте. Обновите страницу и повторите правки.';
+    if (err.code === 'bad-code') return 'Неверный код.';
+    if (err.code === 'too-many') return 'Слишком много попыток. Подождите 15 минут и попробуйте снова.';
+    if (err.code === 'unauthorized') return 'Сессия закончилась. Войдите снова.';
+    if (err.code === 'conflict') return 'Меню уже изменили в другом месте. Обновите страницу и повторите правки.';
+    if (err.code === 'github') return 'Не удалось связаться с GitHub. Попробуйте ещё раз через минуту.';
     return 'Не удалось выполнить действие (' + (err.status || err.message) + '). Попробуйте ещё раз.';
   }
 
   function badPhoto(text) { const e = new Error(text); e.code = 'bad-photo'; return e; }
 
   // ---------- кодирование ----------
-  function decodeBase64(b64) {
-    const bin = atob(b64.replace(/\s/g, ''));
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new TextDecoder('utf-8').decode(bytes);
-  }
-
   function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -168,36 +159,32 @@
     showMsg($('loginMsg'), message || '', message ? 'err' : '');
   }
 
-  async function enter(t, remember) {
-    token = t;
-    const repo = await gh('/repos/' + R);
-    if (repo.permissions && repo.permissions.push === false) {
-      const e = new Error('no-push'); e.code = 'no-push'; throw e;
-    }
-    const file = await gh('/repos/' + R + '/contents/' + CSV_PATH + '?ref=' + REPO.branch);
-    csvSha = file.sha;
-    dishes = MenuLib.parseMenu(decodeBase64(file.content)).map(d =>
+  async function loadMenu() {
+    const data = await api('/menu');
+    csvSha = data.sha;
+    dishes = MenuLib.parseMenu(data.csv).map(d =>
       Object.assign({}, d, { id: ++uid, file: null, previewUrl: null, isNew: false }));
     dirty = false;
-    if (remember) store.set(t); else store.clear();
-    showApp();
   }
+
+  $('showCode').addEventListener('change', e => { $('codeInput').type = e.target.checked ? 'text' : 'password'; });
 
   $('loginForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const t = $('tokenInput').value.trim();
-    if (!/^[A-Za-z0-9_]{20,255}$/.test(t)) {
-      showMsg($('loginMsg'), 'Код выглядит неверно. Скопируйте его целиком, без пробелов.', 'err');
-      return;
-    }
+    const code = $('codeInput').value.trim();
+    if (!code) { showMsg($('loginMsg'), 'Введите код.', 'err'); return; }
     $('loginBtn').disabled = true;
     $('loginBtn').textContent = 'Проверяю…';
     showMsg($('loginMsg'), '', '');
     try {
-      await enter(t, $('rememberInput').checked);
-      $('tokenInput').value = '';
+      const r = await api('/login', { method: 'POST', body: JSON.stringify({ code }) });
+      session = r.session;
+      if (!(dirty && dishes.length)) await loadMenu(); // после истёкшей сессии не затираем несохранённые правки
+      if ($('rememberInput').checked) store.set(session); else store.clear();
+      $('codeInput').value = '';
+      showApp();
     } catch (err) {
-      token = null;
+      session = null;
       showMsg($('loginMsg'), explain(err), 'err');
     } finally {
       $('loginBtn').disabled = false;
@@ -208,7 +195,7 @@
   $('logoutBtn').addEventListener('click', () => {
     if (dirty && !confirm('Есть несохранённые изменения. Выйти без сохранения?')) return;
     store.clear();
-    token = null; dishes = []; dirty = false;
+    session = null; dishes = []; dirty = false;
     updateBar();
     showLogin('');
   });
@@ -381,31 +368,26 @@
         n++;
         $('saveInfo').textContent = 'Загружаю фото ' + n + ' из ' + withPhotos.length + '…';
         const blob = await compressImage(d.file);
-        const fname = 'p-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
-        await gh('/repos/' + R + '/contents/' + UPLOAD_DIR + '/' + fname, {
-          method: 'PUT',
-          body: JSON.stringify({ message: 'Панель владельца: фото блюда', content: await blobToBase64(blob), branch: REPO.branch })
-        });
-        d.photo = UPLOAD_DIR + '/' + fname;
+        const up = await api('/photo', { method: 'POST', body: JSON.stringify({ data: await blobToBase64(blob) }) });
+        d.photo = up.path;
         d.file = null;
       }
       $('saveInfo').textContent = 'Сохраняю меню…';
-      const text = MenuLib.toCSV(dishes);
-      const res = await gh('/repos/' + R + '/contents/' + CSV_PATH, {
-        method: 'PUT',
-        body: JSON.stringify({
-          message: 'Панель владельца: обновление меню',
-          content: await blobToBase64(new Blob([text], { type: 'text/plain;charset=utf-8' })),
-          sha: csvSha,
-          branch: REPO.branch
-        })
-      });
-      csvSha = res.content.sha;
+      const res = await api('/menu', { method: 'PUT', body: JSON.stringify({ csv: MenuLib.toCSV(dishes), sha: csvSha }) });
+      csvSha = res.sha;
       dishes.forEach(d => { d.isNew = false; });
       dirty = false;
       showMsg($('globalMsg'), 'Готово! Изменения появятся на сайте через 1–2 минуты.', 'ok');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
+      if (err.code === 'unauthorized') {
+        // Сессия закончилась: правки остаются на экране, но нужно войти заново
+        store.clear();
+        session = null;
+        saving = false;
+        showLogin(explain(err));
+        return;
+      }
       showMsg($('globalMsg'), explain(err), 'err');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
@@ -415,13 +397,14 @@
   }
   $('saveBtn').addEventListener('click', save);
 
-  // ---------- автоматический вход, если код уже сохранён на этом устройстве ----------
+  // ---------- автоматический вход, если сессия уже сохранена на этом устройстве ----------
   const saved = store.get();
   if (saved) {
     $('loginView').hidden = true;
-    enter(saved, true).catch(err => {
-      if (err.status === 401) store.clear();
-      token = null;
+    session = saved;
+    loadMenu().then(showApp).catch(err => {
+      if (err.code === 'unauthorized') store.clear();
+      session = null;
       showLogin(explain(err));
     });
   }
