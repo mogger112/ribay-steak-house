@@ -20,6 +20,7 @@
   // Старые ключи прошлых версий панели больше не нужны
   try { localStorage.removeItem('ribay_admin_token'); localStorage.removeItem('ribay_admin_session'); } catch (e) { /* ничего */ }
 
+  let loginStarted = false; // владелец уже нажал «Войти» — поздний результат стартовой проверки игнорируем
   let demo = false; // временный демо-режим (js/admin-demo.js): ничего реально не сохраняет
   let csrf = null, csvSha = null, dishes = [], uid = 0, dirty = false, saving = false;
   let addFile = null, addPreviewUrl = null;
@@ -174,6 +175,7 @@
     e.preventDefault();
     const code = $('codeInput').value.trim();
     if (!code) { showMsg($('loginMsg'), 'Введите код.', 'err'); return; }
+    loginStarted = true;
     $('loginBtn').disabled = true;
     $('loginBtn').textContent = 'Проверяю…';
     showMsg($('loginMsg'), '', '');
@@ -421,13 +423,14 @@
 
   $('loginView').hidden = true;
   api('state')
-    .then(resume)
+    .then(st => (loginStarted ? null : resume(st)))
     .catch(err => {
+      if (loginStarted) return null;
       csrf = null;
       // Демо-сессия во вкладке: после перезагрузки страницы остаёмся в демо
       if (err.code === 'not-configured' && window.RIBAY_DEMO && window.RIBAY_DEMO.isActive()) {
         demo = true;
-        return api('state').then(resume).catch(() => { demo = false; showLogin(''); });
+        return api('state').then(st => (loginStarted ? null : resume(st))).catch(() => { if (!loginStarted) { demo = false; showLogin(''); } });
       }
       showLogin(err.code === 'not-configured' ? explain(err) : '');
     });
