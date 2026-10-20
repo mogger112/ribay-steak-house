@@ -222,7 +222,19 @@ ul{margin:0;padding:0;list-style:none;}
 .brand--footer{margin-bottom:6px;}
 .footer__addr{color:var(--text-dim);font-size:.9rem;margin:0;}
 .footer__copy{color:#6b7082;font-size:.8rem;margin:0;}
-.footer__owner{color:#6b7082;font-size:.78rem;text-decoration:underline;margin-top:4px;}
+.footer__owner{background:none;border:0;font:inherit;cursor:pointer;color:#6b7082;font-size:.78rem;text-decoration:underline;margin-top:4px;padding:6px 10px;}
+
+/* Owner modal (admin panel opens in a window on top of the site) */
+.owner-modal{position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(6,7,11,.82);}
+.owner-modal[hidden]{display:none;}
+.owner-modal__box{position:relative;width:min(780px,100%);height:min(92vh,900px);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6);}
+.owner-modal__box iframe{width:100%;height:100%;border:0;display:block;background:var(--bg);}
+.owner-modal__close{position:absolute;top:10px;right:12px;z-index:2;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--bg-panel);color:var(--gold-light);font-size:1.6rem;line-height:1;cursor:pointer;}
+.owner-modal__close:hover{border-color:var(--gold);}
+@media (max-width:600px){
+  .owner-modal{padding:0;}
+  .owner-modal__box{width:100%;height:100%;border-radius:0;border:0;}
+}
 .footer__owner:hover{color:var(--gold-light);}
 
 /* Whatsapp FAB */

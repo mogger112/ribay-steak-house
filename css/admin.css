@@ -1,5 +1,10 @@
 /* Панель владельца */
 .admin [hidden]{display:none !important;}
+
+/* Режим окна поверх сайта (admin.html?embed=1) */
+.admin--embed .admin__top{padding:10px 64px 0 20px;position:static;border:0;background:none;justify-content:flex-end;backdrop-filter:none;}
+.admin--embed .admin__top-actions a,.admin--embed .brand{display:none;}
+.admin--embed .admin__main{padding-top:20px;}
 .admin{min-height:100vh;padding-bottom:110px;}
 .admin__top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);background:rgba(12,14,20,.9);position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);}
 .admin__top-actions{display:flex;gap:8px;align-items:center;}

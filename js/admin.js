@@ -12,6 +12,15 @@
   const MAX_SIDE = 1200;
 
   const $ = id => document.getElementById(id);
+
+  // Открыто как окно поверх сайта: прячем ссылки, ведущие на сайт, и закрываем окно по Esc
+  if (new URLSearchParams(location.search).get('embed') === '1' && window.parent !== window) {
+    document.body.classList.add('admin--embed');
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') window.parent.postMessage({ type: 'ribay-owner-close' }, location.origin);
+    });
+  }
+
   const store = {
     get() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } },
     set(v) { try { localStorage.setItem(TOKEN_KEY, v); } catch (e) { /* приватный режим */ } },

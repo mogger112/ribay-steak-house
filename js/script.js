@@ -143,3 +143,32 @@ lightbox.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') lightbox.classList.remove('is-open');
 });
+
+// Owner panel window: nothing loads until the owner presses the small footer button
+(function () {
+  const modal = document.getElementById('ownerModal');
+  const frame = document.getElementById('ownerFrame');
+  const openBtn = document.getElementById('ownerOpen');
+  const closeBtn = document.getElementById('ownerClose');
+  if (!modal || !frame || !openBtn || !closeBtn) return;
+
+  function open() {
+    if (!frame.getAttribute('src')) frame.src = 'admin.html?embed=1';
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    closeBtn.focus();
+  }
+  function close() {
+    modal.hidden = true;
+    document.body.style.overflow = '';
+    openBtn.focus();
+  }
+
+  openBtn.addEventListener('click', open);
+  closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) close(); });
+  window.addEventListener('message', e => {
+    if (e.origin === location.origin && e.data && e.data.type === 'ribay-owner-close' && !modal.hidden) close();
+  });
+})();
