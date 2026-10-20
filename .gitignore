@@ -3,3 +3,11 @@ Thumbs.db
 *.log
 .env
 .env.*
+
+# Секреты и служебные файлы хостинга — никогда не публиковать
+config.php
+dist/
+storage/sessions/
+storage/backups/
+storage/rate.json
+storage/menu.lock

@@ -1,11 +1,9 @@
-// Панель владельца: правит меню и загружает фото через наш сервер (worker/index.js).
-// В браузере хранится только временная подписанная сессия — ключей GitHub здесь нет.
+// Панель владельца: правит меню и загружает фото через серверный файл api.php на хостинге.
+// В браузере нет ни паролей, ни ключей: вход держится на защищённой cookie сессии.
 (() => {
   'use strict';
 
-  // Адрес сервера (Cloudflare Worker), например 'https://ribay-admin.ИМЯ.workers.dev'. Пусто — вход ещё не подключён.
-  const WORKER_URL = '';
-  const SESSION_KEY = 'ribay_admin_session';
+  const API = 'api.php';
   const MAX_PHOTO_BYTES = 30 * 1024 * 1024;
   const MAX_SIDE = 1200;
 
@@ -19,15 +17,10 @@
     });
   }
 
-  const store = {
-    get() { try { return localStorage.getItem(SESSION_KEY); } catch (e) { return null; } },
-    set(v) { try { localStorage.setItem(SESSION_KEY, v); } catch (e) { /* приватный режим */ } },
-    clear() { try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* ничего */ } }
-  };
   // Старые ключи прошлых версий панели больше не нужны
-  try { localStorage.removeItem('ribay_admin_token'); } catch (e) { /* ничего */ }
+  try { localStorage.removeItem('ribay_admin_token'); localStorage.removeItem('ribay_admin_session'); } catch (e) { /* ничего */ }
 
-  let session = null, csvSha = null, dishes = [], uid = 0, dirty = false, saving = false;
+  let csrf = null, csvSha = null, dishes = [], uid = 0, dirty = false, saving = false;
   let addFile = null, addPreviewUrl = null;
 
   // ---------- маленький помощник для DOM (весь текст — только через textContent) ----------
@@ -45,18 +38,21 @@
     return e;
   }
 
-  // ---------- запросы к нашему серверу ----------
-  async function api(path, options) {
+  // ---------- запросы к серверу (api.php) ----------
+  async function api(action, options) {
     options = options || {};
-    if (!WORKER_URL) { const e = new Error('not-configured'); e.code = 'not-configured'; throw e; }
     const headers = {};
-    if (session) headers.Authorization = 'Bearer ' + session;
     if (options.body) headers['Content-Type'] = 'application/json';
+    if (csrf) headers['X-CSRF-Token'] = csrf;
     let res;
     try {
-      res = await fetch(WORKER_URL.replace(/\/$/, '') + path, Object.assign({}, options, { headers, cache: 'no-store' }));
+      res = await fetch(API + '?action=' + action, Object.assign({}, options, { headers, credentials: 'same-origin', cache: 'no-store' }));
     } catch (e) {
       const err = new Error('network'); err.code = 'network'; throw err;
+    }
+    // Если вместо ответа сервера пришла обычная страница (например, на хостинге без PHP), панель ещё не подключена
+    if (!/json/i.test(res.headers.get('content-type') || '')) {
+      const err = new Error('not-configured'); err.code = 'not-configured'; throw err;
     }
     let data = {};
     try { data = await res.json(); } catch (e) { /* пустой ответ */ }
@@ -70,13 +66,14 @@
 
   function explain(err) {
     if (err.code === 'network') return 'Нет связи с интернетом или с сервером. Проверьте подключение и попробуйте ещё раз.';
-    if (err.code === 'not-configured') return 'Вход пока не подключён к серверу. Сообщите разработчику сайта.';
-    if (err.code === 'bad-photo') return err.message;
+    if (err.code === 'not-configured') return 'Вход пока не подключён: на сервере нет файлов api.php и config.php или не работает PHP. Сообщите разработчику сайта.';
+    if (err.code === 'bad-photo') return err.message || 'Фото не подошло. Выберите другое (JPG или PNG).';
     if (err.code === 'bad-code') return 'Неверный код.';
     if (err.code === 'too-many') return 'Слишком много попыток. Подождите 15 минут и попробуйте снова.';
     if (err.code === 'unauthorized') return 'Сессия закончилась. Войдите снова.';
     if (err.code === 'conflict') return 'Меню уже изменили в другом месте. Обновите страницу и повторите правки.';
-    if (err.code === 'github') return 'Не удалось связаться с GitHub. Попробуйте ещё раз через минуту.';
+    if (err.code === 'write-failed') return 'Сервер не смог сохранить файл. Попросите разработчика проверить права записи на папки data, storage и assets/img/uploads.';
+    if (err.code === 'too-many-files') return 'Загружено слишком много фото. Сообщите разработчику сайта.';
     return 'Не удалось выполнить действие (' + (err.status || err.message) + '). Попробуйте ещё раз.';
   }
 
@@ -160,8 +157,8 @@
   }
 
   async function loadMenu() {
-    const data = await api('/menu');
-    csvSha = data.sha;
+    const data = await api('menu');
+    csvSha = data.version;
     dishes = MenuLib.parseMenu(data.csv).map(d =>
       Object.assign({}, d, { id: ++uid, file: null, previewUrl: null, isNew: false }));
     dirty = false;
@@ -177,14 +174,13 @@
     $('loginBtn').textContent = 'Проверяю…';
     showMsg($('loginMsg'), '', '');
     try {
-      const r = await api('/login', { method: 'POST', body: JSON.stringify({ code }) });
-      session = r.session;
+      const r = await api('login', { method: 'POST', body: JSON.stringify({ code, remember: $('rememberInput').checked }) });
+      csrf = r.csrf;
       if (!(dirty && dishes.length)) await loadMenu(); // после истёкшей сессии не затираем несохранённые правки
-      if ($('rememberInput').checked) store.set(session); else store.clear();
       $('codeInput').value = '';
       showApp();
     } catch (err) {
-      session = null;
+      csrf = null;
       showMsg($('loginMsg'), explain(err), 'err');
     } finally {
       $('loginBtn').disabled = false;
@@ -194,8 +190,8 @@
 
   $('logoutBtn').addEventListener('click', () => {
     if (dirty && !confirm('Есть несохранённые изменения. Выйти без сохранения?')) return;
-    store.clear();
-    session = null; dishes = []; dirty = false;
+    api('logout', { method: 'POST', body: '{}' }).catch(() => {});
+    csrf = null; dishes = []; dirty = false;
     updateBar();
     showLogin('');
   });
@@ -368,13 +364,13 @@
         n++;
         $('saveInfo').textContent = 'Загружаю фото ' + n + ' из ' + withPhotos.length + '…';
         const blob = await compressImage(d.file);
-        const up = await api('/photo', { method: 'POST', body: JSON.stringify({ data: await blobToBase64(blob) }) });
+        const up = await api('photo', { method: 'POST', body: JSON.stringify({ data: await blobToBase64(blob) }) });
         d.photo = up.path;
         d.file = null;
       }
       $('saveInfo').textContent = 'Сохраняю меню…';
-      const res = await api('/menu', { method: 'PUT', body: JSON.stringify({ csv: MenuLib.toCSV(dishes), sha: csvSha }) });
-      csvSha = res.sha;
+      const res = await api('menu', { method: 'POST', body: JSON.stringify({ csv: MenuLib.toCSV(dishes), version: csvSha }) });
+      csvSha = res.version;
       dishes.forEach(d => { d.isNew = false; });
       dirty = false;
       showMsg($('globalMsg'), 'Готово! Изменения появятся на сайте через 1–2 минуты.', 'ok');
@@ -382,8 +378,7 @@
     } catch (err) {
       if (err.code === 'unauthorized') {
         // Сессия закончилась: правки остаются на экране, но нужно войти заново
-        store.clear();
-        session = null;
+        csrf = null;
         saving = false;
         showLogin(explain(err));
         return;
@@ -397,15 +392,16 @@
   }
   $('saveBtn').addEventListener('click', save);
 
-  // ---------- автоматический вход, если сессия уже сохранена на этом устройстве ----------
-  const saved = store.get();
-  if (saved) {
-    $('loginView').hidden = true;
-    session = saved;
-    loadMenu().then(showApp).catch(err => {
-      if (err.code === 'unauthorized') store.clear();
-      session = null;
-      showLogin(explain(err));
+  // ---------- автоматический вход, если сессия ещё действует на этом устройстве ----------
+  $('loginView').hidden = true;
+  api('state')
+    .then(st => {
+      if (!st.loggedIn) { showLogin(''); return null; }
+      csrf = st.csrf;
+      return loadMenu().then(showApp);
+    })
+    .catch(err => {
+      csrf = null;
+      showLogin(err.code === 'not-configured' ? explain(err) : '');
     });
-  }
 })();
